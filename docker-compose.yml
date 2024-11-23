@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./fail2ban/data:/data
+      - ./fail2ban/log:/var/log/fail2ban
+      - ./nginx/logs:/var/log/nginx:ro
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Warsaw
+      - F2B_LOG_TARGET=STDOUT
+      - F2B_LOG_LEVEL=INFO
+      - F2B_DB_PURGE_AGE=1d
+      - F2B_IPTABLES_CHAIN=DOCKER-USER
+
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    volumes:
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/auth/.htpasswd:/etc/nginx/.htpasswd
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/ssl:/etc/nginx/ssl       
+      - ./nginx/ssl/dhparam.pem:/etc/nginx/dhparam.pem
+    ports:
+      - "51821:80"
+      - "81:81"
+      - "88:88"
+      - "443:443"               
+    networks:
+      vpn-network:
+        ipv4_address: 172.20.0.3
+
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:latest
+    container_name: wg-easy
+    environment:
+      - WG_HOST=YOUR_HOST_IP
+      - PASSWORD_HASH=YOUR_HASH
+      - WG_DEFAULT_ADDRESS=10.13.13.x
+      - WG_DEFAULT_DNS=1.1.1.1
+      - WG_ALLOWED_IPS=172.20.0.0/16
+      - WG_MTU=1420
+      - WG_PERSISTENT_KEEPALIVE=25
+      # Dodaj te zmienne
+      - WG_PORT=51820
+      - WG_UI_PORT=51821
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - ./wg-easy-data:/etc/wireguard
+    ports:
+      - "51820:51820/udp"
+    expose:
+      - "51821"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    networks:
+      vpn-network:
+        ipv4_address: 172.20.0.2
+
+  mongodb:
+    image: mongo:latest
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    networks:
+      vpn-network:
+        ipv4_address: 172.20.0.10
+    command: ["mongod", "--bind_ip_all"]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  backend:
+    image: registry.klegus.tech/xlsx-refresher-new:latest
+    container_name: backend
+    restart: unless-stopped
+    environment:
+      - EMAIL=${EMAIL}
+      - PASSWORD=${PASSWORD}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SELECTED_MODEL=${SELECTED_MODEL}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - MOODLE_URL=${MOODLE_URL}
+      - DEV=${DEV}
+      - MONGO_DB=${MONGO_DB}
+      - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
+      - WERKZEUG_RUN_MAIN=${WERKZEUG_RUN_MAIN}
+      - ENABLE_COMPARER=${ENABLE_COMPARER}
+    networks:
+      vpn-network:
+        ipv4_address: 172.20.0.20
+    depends_on:
+      - mongodb
+
+  frontend:
+    image: registry.klegus.tech/www-plan:latest
+    container_name: www-plan
+    restart: unless-stopped
+    environment:
+      - COMPARER=${COMPARER}
+      - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
+      - DEV=${DEV}
+      - BACKEND_URL=https://172.20.0.3:81
+    networks:
+      vpn-network:
+        ipv4_address: 172.20.0.30
+    depends_on:
+      - mongodb
+      - backend
+
+networks:
+  vpn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+volumes:
+  mongodb_data:
+  wg-easy-data:

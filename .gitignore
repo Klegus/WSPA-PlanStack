@@ -1,0 +1,8 @@
+wg-easy-data/
+.env
+clear.py
+manager.py
+plans.json
+nginx/auth/.htpasswd
+nginx/logs/
+fail2ban/data/db/fail2ban.sqlite3
