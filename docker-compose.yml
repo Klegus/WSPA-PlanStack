@@ -109,14 +109,11 @@ services:
       - mongodb
 
   frontend:
-    image: registry.klegus.tech/www-plan:latest
+    image: registry.klegus.tech/www-plan-js:latest
     container_name: www-plan
     restart: unless-stopped
     environment:
-      - COMPARER=${COMPARER}
-      - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
-      - DEV=${DEV}
-      - BACKEND_URL=https://172.20.0.3:81
+      - NEXT_PUBLIC_API_URL=http://172.20.0.20
     networks:
       vpn-network:
         ipv4_address: 172.20.0.30

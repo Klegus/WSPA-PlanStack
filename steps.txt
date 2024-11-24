@@ -1,0 +1,4 @@
+1. stworzyc foldery nginx/auth nginx/ssl
+2. przerzucic nginx.conf z głownego folderu jesli chcesz uzywac ssl 
+3. zamienic w nginx.conf na nowa domene
+4. uzyskac 
