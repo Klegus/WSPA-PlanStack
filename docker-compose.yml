@@ -87,7 +87,7 @@ services:
           memory: 1G
 
   backend:
-    image: registry.klegus.tech/xlsx-refresher-new:latest
+    image: xlsx-refresher-new:noti
     container_name: backend
     restart: unless-stopped
     environment:
